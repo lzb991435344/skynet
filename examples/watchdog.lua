@@ -17,6 +17,7 @@ function SOCKET.open(fd, addr)
 	--可以通过 lua 协议向它发送一个 open 指令，附带一个启动参数表
 
 	--向skynet框架发送一条消息
+	--调用agent里的CMD.start(conf)
 	skynet.call(agent[fd], "lua", "start", { gate = gate, client = fd, watchdog = skynet.self() })
 end
 
