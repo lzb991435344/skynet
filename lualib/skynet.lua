@@ -399,6 +399,7 @@ function skynet.call(addr, typename, ...)
 	if session == nil then
 		error("call to invalid address " .. skynet.address(addr))
 	end
+	--解包得到address 和session
 	return p.unpack(yield_call(addr, session))
 end
 
