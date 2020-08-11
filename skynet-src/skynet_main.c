@@ -77,7 +77,28 @@ _init_env(lua_State *L) {
 
 int sigign() {
 	struct sigaction sa;
+	//SIG_DFL,SIG_IGN 分别表示无返回值的函数指针，指针值分别是0和1，这两个指针值逻辑上
+	//讲是实际程序中不可能出现的函数地址值。
+	//SIG_DFL：默认信号处理程序
+	//SIG_IGN：忽略信号的处理程序
 	sa.sa_handler = SIG_IGN;
+
+	//对一个对端已经关闭的socket调用两次write, 第二次将会生成SIGPIPE信号, 
+	//该信号默认结束进程.
+
+	/**
+	多线程屏蔽SIGPIPE信号
+	void BlockSigno(int signo)
+	{
+    	sigset_t signal_mask;
+   		sigemptyset(&signal_mask);
+    	sigaddset(&signal_mask, signo);
+    	pthread_sigmask(SIG_BLOCK, &signal_mask, NULL);
+	}
+	BlockSigno(SIGPIPE);
+
+	*/
+
 	sigaction(SIGPIPE, &sa, 0);
 	return 0;
 }
@@ -115,7 +136,10 @@ static const char * load_config = "\
 
 int
 main(int argc, char *argv[]) {
-	const char * config_file = NULL ;
+
+	//  argv[0]  argv[1]	
+	// ./skynet  examples/config
+	const char * config_file = NULL ; //配置的文件名
 	if (argc > 1) {
 		config_file = argv[1];
 	} else {
@@ -125,11 +149,23 @@ main(int argc, char *argv[]) {
 	}
 
 	luaS_initshr();
+
+	/**
+	struct skynet_node {
+		int total;
+		int init;
+		uint32_t monitor_exit;
+		pthread_key_t handle_key;
+	};
+	*/
 	skynet_globalinit();
-	skynet_env_init();
 
-	sigign();
+	skynet_env_init();//初始化lua的环境
 
+	sigign();//信号处理
+
+
+	//配置的结构
 	struct skynet_config config;
 
 	struct lua_State *L = luaL_newstate();

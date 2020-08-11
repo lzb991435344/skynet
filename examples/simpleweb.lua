@@ -61,6 +61,8 @@ else
 
 skynet.start(function()
 	local agent = {}
+
+	--启动20个 agent服务
 	for i= 1, 20 do
 		agent[i] = skynet.newservice(SERVICE_NAME, "agent")
 	end

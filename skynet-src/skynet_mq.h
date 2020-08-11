@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 
+//skynet消息的结构体
 struct skynet_message {
 	uint32_t source;
 	int session;

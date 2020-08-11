@@ -9,8 +9,8 @@
 #include <assert.h>
 #include <stdbool.h>
 
-#define DEFAULT_QUEUE_SIZE 64
-#define MAX_GLOBAL_MQ 0x10000
+#define DEFAULT_QUEUE_SIZE 64  //默认大小是 64
+#define MAX_GLOBAL_MQ 0x10000  //最大大小是64k
 
 // 0 means mq is not in global mq.
 // 1 means mq is in global mq , or the message is dispatching.
@@ -20,36 +20,41 @@
 
 struct message_queue {
 	struct spinlock lock;
-	uint32_t handle;
+	uint32_t handle;//句柄
 	int cap;
 	int head;
 	int tail;
-	int release;
-	int in_global;
+	int release;//释放标记
+	int in_global;//全局
 	int overload;
 	int overload_threshold;
-	struct skynet_message *queue;
-	struct message_queue *next;
+	struct skynet_message *queue; //消息
+	struct message_queue *next;//指向下一条消息 //单链表
 };
 
 struct global_queue {
-	struct message_queue *head;
-	struct message_queue *tail;
-	struct spinlock lock;
+	struct message_queue *head;//头
+	struct message_queue *tail;//尾
+	struct spinlock lock; //自旋锁对象
 };
 
+
+//全局队列的指针变量
 static struct global_queue *Q = NULL;
 
+
+//压入全局的消息
 void 
 skynet_globalmq_push(struct message_queue * queue) {
-	struct global_queue *q= Q;
+	struct global_queue *q= Q;//全局队列
 
 	SPIN_LOCK(q)
 	assert(queue->next == NULL);
+	//变为全局队列的队尾
 	if(q->tail) {
 		q->tail->next = queue;
 		q->tail = queue;
-	} else {
+	} else {//队尾为空
 		q->head = q->tail = queue;
 	}
 	SPIN_UNLOCK(q)
@@ -59,9 +64,13 @@ struct message_queue *
 skynet_globalmq_pop() {
 	struct global_queue *q = Q;
 
-	SPIN_LOCK(q)
+	SPIN_LOCK(q)   //int lock
+
+	//自旋锁，当前线程不会阻塞挂起，而是不断循环忙等，等待条件成立
 	struct message_queue *mq = q->head;
 	if(mq) {
+
+		//指向下一个
 		q->head = mq->next;
 		if(q->head == NULL) {
 			assert(mq == q->tail);
@@ -69,11 +78,15 @@ skynet_globalmq_pop() {
 		}
 		mq->next = NULL;
 	}
+
+
 	SPIN_UNLOCK(q)
 
 	return mq;
 }
 
+
+//skynet消息队列的创建
 struct message_queue * 
 skynet_mq_create(uint32_t handle) {
 	struct message_queue *q = skynet_malloc(sizeof(*q));
@@ -81,6 +94,7 @@ skynet_mq_create(uint32_t handle) {
 	q->cap = DEFAULT_QUEUE_SIZE;
 	q->head = 0;
 	q->tail = 0;
+
 	SPIN_INIT(q)
 	// When the queue is create (always between service create and service init) ,
 	// set in_global flag to avoid push it to global queue .
@@ -89,6 +103,8 @@ skynet_mq_create(uint32_t handle) {
 	q->release = 0;
 	q->overload = 0;
 	q->overload_threshold = MQ_OVERLOAD;
+
+	//消息队列的大小
 	q->queue = skynet_malloc(sizeof(struct skynet_message) * q->cap);
 	q->next = NULL;
 
@@ -121,6 +137,8 @@ skynet_mq_length(struct message_queue *q) {
 	if (head <= tail) {
 		return tail - head;
 	}
+
+	// m + r - f
 	return tail + cap - head;
 }
 
@@ -171,6 +189,8 @@ skynet_mq_pop(struct message_queue *q, struct skynet_message *message) {
 	return ret;
 }
 
+
+//展开队列
 static void
 expand_queue(struct message_queue *q) {
 	struct skynet_message *new_queue = skynet_malloc(sizeof(struct skynet_message) * q->cap * 2);
@@ -208,6 +228,8 @@ skynet_mq_push(struct message_queue *q, struct skynet_message *message) {
 	SPIN_UNLOCK(q)
 }
 
+
+//全局数组的初始化
 void 
 skynet_mq_init() {
 	struct global_queue *q = skynet_malloc(sizeof(*q));
